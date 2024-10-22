@@ -1,0 +1,6 @@
+@authentication_server_HostAddress = http://localhost:5246
+
+GET {{authentication_server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
