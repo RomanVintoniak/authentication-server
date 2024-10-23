@@ -11,8 +11,7 @@ namespace authentication_server.Models
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
-        public byte[] Password { get; set; } = [];
-        public byte[] PasswordSalt { get; set; } = [];
+        public byte[] PasswordHash { get; set; } = [];
         public bool IsEmailConfirmed { get; set; } = false;
         public string? TwoFactorAuthSecret { get; set; }
         public string? PasswordResetToken { get; set; }
