@@ -1,10 +1,8 @@
 ﻿using authentication_server.Configurations;
 using authentication_server.DTOs;
 using authentication_server.Models;
-using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
