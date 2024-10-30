@@ -45,7 +45,7 @@ namespace authentication_server.Controllers
                     return Created();
                 }
 
-                return BadRequest($"User with email {user.Email} already exist");
+                return BadRequest($"User with this email already exists");
             }
 
             return BadRequest("Passwords don't match");
