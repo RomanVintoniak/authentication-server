@@ -7,11 +7,11 @@ namespace authentication_server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserController : Controller
+    public class UsersController : Controller
     {
         private readonly UserService UserService;
 
-        public UserController(UserService userService)
+        public UsersController(UserService userService)
         {
             UserService = userService;
         }
@@ -20,7 +20,7 @@ namespace authentication_server.Controllers
         public async Task<IActionResult> Get(string id)
         {
             User user = await UserService.GetAsync(id);
-            
+
             if (user is null)
             {
                 return NotFound("There is no user with this id");
