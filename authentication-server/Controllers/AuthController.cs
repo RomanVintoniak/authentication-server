@@ -63,7 +63,7 @@ namespace authentication_server.Controllers
 
                 if (AreHashesEqual(userFromDB.PasswordHash, passwordHash))
                 {
-                    return Ok( new { id = userFromDB.Id } );
+                    return Ok(userFromDB.Id);
                 }
             }
 
