@@ -1,6 +1,9 @@
 using authentication_server.Configurations;
 using authentication_server.Interfaces;
 using authentication_server.Services;
+using authentication_server.Validations;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +18,10 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddScoped<IUserRepository, UserService>();
 builder.Services.AddSingleton<UserService>();
+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<LoginUserValidator>();
 
 builder.Services.AddCors(options => {
     options.AddPolicy(name: "allowAllOrigins",
