@@ -1,11 +1,13 @@
 ﻿using authentication_server.DTOs;
 using authentication_server.Models;
 using authentication_server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace authentication_server.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class UsersController : Controller
     {

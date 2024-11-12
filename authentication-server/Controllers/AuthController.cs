@@ -1,9 +1,13 @@
 ﻿using authentication_server.Configurations;
 using authentication_server.DTOs;
 using authentication_server.Models;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -14,12 +18,14 @@ namespace authentication_server.Controllers
     public class AuthController : Controller
     {
         private readonly IMongoCollection<User> usersCollection;
+        public readonly JwtConfig jwtConfig;
 
-        public AuthController(IOptions<DatabaseSettings> databaseSettings)
+        public AuthController(IOptions<DatabaseSettings> databaseSettings, IOptions<JwtConfig> jwtConfig)
         {
             MongoClient mongoClient = new MongoClient(databaseSettings.Value.ConnectionString);
             IMongoDatabase mongoDB = mongoClient.GetDatabase(databaseSettings.Value.DatabaseName);
             usersCollection = mongoDB.GetCollection<User>(databaseSettings.Value.CollectionName);
+            this.jwtConfig = jwtConfig.Value;
         }
 
 
@@ -63,7 +69,9 @@ namespace authentication_server.Controllers
 
                 if (AreHashesEqual(userFromDB.PasswordHash, passwordHash))
                 {
-                    return Ok(userFromDB.Id);
+                    string jwtToken = GetJwtToken(userFromDB.Id, userFromDB.Email);
+
+                    return Ok(new { token = jwtToken, userId = userFromDB.Id} );
                 }
             }
 
@@ -108,6 +116,29 @@ namespace authentication_server.Controllers
             }
 
             return true;
+        }
+
+        private string GetJwtToken(string userId, string email)
+        {
+            JwtSecurityTokenHandler jwtHadler = new();
+            
+            byte[] key = Encoding.UTF8.GetBytes(jwtConfig.TokenKey);
+
+            SecurityTokenDescriptor tokenDescriptor = new()
+            {
+                Subject = new ClaimsIdentity([
+                    new Claim("id", userId),
+                    new Claim("email", email)
+                ]),
+                Expires = DateTime.Now.AddHours(1),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256
+                )
+            };
+
+            SecurityToken token = jwtHadler.CreateToken(tokenDescriptor);
+
+            return jwtHadler.WriteToken(token);
         }
     }
 }
