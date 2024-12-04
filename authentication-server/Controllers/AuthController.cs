@@ -1,12 +1,10 @@
 ﻿using authentication_server.Configurations;
 using authentication_server.DTOs;
+using authentication_server.Interfaces;
 using authentication_server.Models;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,24 +15,28 @@ namespace authentication_server.Controllers
     [Route("api/[controller]")]
     public class AuthController : Controller
     {
-        private readonly IMongoCollection<User> usersCollection;
-        public readonly JwtConfig jwtConfig;
+        private readonly IJwtService _jwtService;
+        private readonly IEmailService _emailService;
+        private readonly IUserRepository _userRepository;
 
-        public AuthController(IOptions<DatabaseSettings> databaseSettings, IOptions<JwtConfig> jwtConfig)
+        public AuthController(
+            IJwtService jwtService,
+            IEmailService emailService,
+            IUserRepository userRepository
+        )
         {
-            MongoClient mongoClient = new MongoClient(databaseSettings.Value.ConnectionString);
-            IMongoDatabase mongoDB = mongoClient.GetDatabase(databaseSettings.Value.DatabaseName);
-            usersCollection = mongoDB.GetCollection<User>(databaseSettings.Value.CollectionName);
-            this.jwtConfig = jwtConfig.Value;
+            _jwtService = jwtService;
+            _emailService = emailService;
+            _userRepository = userRepository;
         }
 
 
         [HttpPost("Registration")]
-        public IActionResult Registration(UserRegistrationDTO user)
+        public async Task<ActionResult> Registration(UserRegistrationDTO user)
         {
             if (user.Password == user.PasswordConfirm)
             {
-                User userFromDB = usersCollection.Find(u => u.Email == user.Email).FirstOrDefault();
+                User userFromDB = await _userRepository.GetByEmailAsync(user.Email);
 
                 if (userFromDB is null)
                 {
@@ -46,7 +48,7 @@ namespace authentication_server.Controllers
                         PasswordHash = SHA256.HashData(Encoding.UTF8.GetBytes(user.Password)),
                     };
 
-                    usersCollection.InsertOne(newUser);
+                    await _userRepository.CreateAsync(newUser);
 
                     return Created();
                 }
@@ -59,9 +61,9 @@ namespace authentication_server.Controllers
 
 
         [HttpPost("Login")]
-        public IActionResult Login(UserLoginDTO user)
+        public async Task<ActionResult> Login(UserLoginDTO user)
         {
-            User userFromDB = usersCollection.Find(u => u.Email == user.Email).FirstOrDefault();
+            User userFromDB = await _userRepository.GetByEmailAsync(user.Email);
 
             if (userFromDB is not null)
             {
@@ -69,7 +71,14 @@ namespace authentication_server.Controllers
 
                 if (AreHashesEqual(userFromDB.PasswordHash, passwordHash))
                 {
-                    string jwtToken = GetJwtToken(userFromDB.Id, userFromDB.Email);
+                    Claim[] claims = [
+                        new Claim("userId", userFromDB.Id),
+                        new Claim("email", userFromDB.Email)
+                    ];
+
+                    string jwtToken = _jwtService.GetToken(claims, DateTime.Now.AddHours(1));
+
+                    await _emailService.SendEmailVerificationAsync(userFromDB.Email);
 
                     return Ok(new { token = jwtToken, userId = userFromDB.Id} );
                 }
@@ -79,27 +88,35 @@ namespace authentication_server.Controllers
         }
 
 
-        [HttpPost("DefaultUser")]
-        public IActionResult PostDefaultUser()
+        [HttpGet("Email-verification/{token}")]
+        public async Task<ActionResult> VerifyEmail(string token)
         {
-            string password = "123789";
-            byte[] passwordHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-
-            User user = new()
+            if(!_jwtService.IsTokenValid(token))
             {
-                FirstName = "John",
-                LastName = "Smit",
-                Email = "johnsmit@gmail.com",
-                PasswordHash = passwordHash,
-                IsEmailConfirmed = false,
-                PasswordResetTokenExpires = DateTime.UtcNow.AddMinutes(30)
-            };
+                return BadRequest();
+            }
 
-            usersCollection.InsertOne(user);
+            string? userEmail = _jwtService.GetUserEmailFromToken(token);
 
-            return Ok(user);
+            if (userEmail is null)
+            {
+                return BadRequest();
+            }
+
+            User user = await _userRepository.GetByEmailAsync(userEmail);
+
+            if (user is null)
+            {
+                return NotFound();
+            }
+
+            user.IsEmailConfirmed = true;
+            await _userRepository.UpdateAsync(user);
+
+            return Ok();
         }
         
+
         private static bool AreHashesEqual(byte[] hash1, byte[] hash2)
         {
             if (hash1.Length != hash2.Length)
@@ -116,29 +133,6 @@ namespace authentication_server.Controllers
             }
 
             return true;
-        }
-
-        private string GetJwtToken(string userId, string email)
-        {
-            JwtSecurityTokenHandler jwtHadler = new();
-            
-            byte[] key = Encoding.UTF8.GetBytes(jwtConfig.TokenKey);
-
-            SecurityTokenDescriptor tokenDescriptor = new()
-            {
-                Subject = new ClaimsIdentity([
-                    new Claim("id", userId),
-                    new Claim("email", email)
-                ]),
-                Expires = DateTime.Now.AddHours(1),
-                SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256
-                )
-            };
-
-            SecurityToken token = jwtHadler.CreateToken(tokenDescriptor);
-
-            return jwtHadler.WriteToken(token);
         }
     }
 }

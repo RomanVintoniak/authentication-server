@@ -5,10 +5,12 @@ using authentication_server.Swagger;
 using authentication_server.Validations;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,15 +18,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<DatabaseSettings>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("JwtConfiguration"));
+builder.Services.Configure<EmailServiceConfig>(builder.Configuration.GetSection("EmailServiceConfiguration"));
 
 builder.Services.AddControllers();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
+builder.Services.AddTransient<JwtSecurityTokenHandler>();
 
 builder.Services.AddScoped<IUserRepository, UserService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ISmtpClient, SmtpClient>();
+builder.Services.AddScoped<IJwtService, JwtService>();
+
 builder.Services.AddSingleton<UserService>();
 
 builder.Services.AddFluentValidationAutoValidation();
@@ -55,6 +64,7 @@ builder.Services.AddAuthentication(options =>
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateLifetime = true,
         ValidateIssuer = false,
         ValidateAudience = false,
     };

@@ -21,7 +21,7 @@ namespace authentication_server.Controllers
         [HttpGet("{id:length(24)}")]
         public async Task<IActionResult> Get(string id)
         {
-            User user = await UserService.GetAsync(id);
+            User user = await UserService.GetByIdAsync(id);
 
             if (user is null)
             {
