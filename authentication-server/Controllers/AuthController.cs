@@ -49,6 +49,7 @@ namespace authentication_server.Controllers
                     };
 
                     await _userRepository.CreateAsync(newUser);
+                    await _emailService.SendEmailVerificationAsync(newUser.Email);
 
                     return Created();
                 }
@@ -77,8 +78,6 @@ namespace authentication_server.Controllers
                     ];
 
                     string jwtToken = _jwtService.GetToken(claims, DateTime.Now.AddHours(1));
-
-                    await _emailService.SendEmailVerificationAsync(userFromDB.Email);
 
                     return Ok(new { token = jwtToken, userId = userFromDB.Id} );
                 }
